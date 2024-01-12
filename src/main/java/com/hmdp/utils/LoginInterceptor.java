@@ -18,43 +18,15 @@ import static com.hmdp.utils.RedisConstants.*;
  * @Time 20240111 20:27
  **/
 public class LoginInterceptor implements HandlerInterceptor {
-
-    StringRedisTemplate stringRedisTemplate;
-
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 从请求头中获取token
-        String token = request.getHeader("authorization");
-        // 判断token是否存在
-        if (StrUtil.isBlank(token)) {
+        // 判断是否需要拦截（ThreadLocal是否有用户信息）
+        if (UserHolder.getUser() == null) {
             // 不存在，拦截，返回401状态码
             response.setStatus(401);
             return false;
         }
-
-        // 基于token从Redis中获取用户信息
-        String tokenKey = LOGIN_USER_KEY + token;
-        Map<Object, Object> userMap =  stringRedisTemplate.opsForHash().entries(tokenKey);
-        // 判断用户信息是否存在
-        if (userMap.isEmpty()) {
-            // 不存在，拦截，返回401状态码
-            response.setStatus(401);
-            return false;
-        }
-
-        // 将查询数据转换成UserDTO并保存到ThreadLocal中
-        UserDTO userDTO = BeanUtil.fillBeanWithMap(userMap, new UserDTO(), false);
-        UserHolder.saveUser(userDTO);
-
-        // 更新Redis中用户信息的有效期
-        stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
-        // 放行
+        // 有用户，放行
         return true;
-    }
-
-    @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
-        // 移除用户
-        UserHolder.removeUser();
     }
 }
