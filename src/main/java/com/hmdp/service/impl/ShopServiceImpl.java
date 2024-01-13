@@ -46,13 +46,15 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     public Result queryById(Long id) {
         // 缓存穿透
         //Shop shop = queryWithPassThrough(id);
-        Shop shop = cacheClient.queryWithPassThrough(
-                CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
+//        Shop shop = cacheClient.queryWithPassThrough(
+//                CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
         // 互斥锁解决缓存击穿
         //Shop shop = queryWithMutex(id);
 
         // 逻辑过期解决缓存击穿
-        //Shop shop = queryWithLogicExpire(id);
+        //Shop shop = queryWithLogicalExpire(id);
+        Shop shop = cacheClient.queryWithLogicalExpire(
+                CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
         if (shop == null) {
             return Result.fail("商铺不存在");
         }
@@ -62,7 +64,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     // 逻辑过期缓存重建线程池
     private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
-    private Shop queryWithLogicExpire(Long id) {
+    private Shop queryWithLogicalExpire(Long id) {
         String key = CACHE_SHOP_KEY + id;
         // 从redis查询商铺缓存
         String shopJson = stringRedisTemplate.opsForValue().get(key);
