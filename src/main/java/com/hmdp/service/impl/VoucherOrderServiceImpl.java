@@ -9,6 +9,7 @@ import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +34,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private RedisIdWorker redisIdWorker;
 
     @Override
-    @Transactional
     public Result seckillVoucher(Long voucherId) {
         // 查询优惠券
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
@@ -52,6 +52,36 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             // 库存不足
             return Result.fail("库存不足");
         }
+
+        Long userId = UserHolder.getUser().getId();
+        // 减小锁的粒度，只锁住当前用户的操作
+        // 但是在方法内锁，锁释放后事务还没提交，其他线程还是可以进来，所以要在方法外锁
+        // toString()每次会生成一个新的字符串对象，所以这里要用intern()方法获取字符串常量池中的字符串对象
+        synchronized (userId.toString().intern()) {
+            // 事务生效是调用的代理对象，所以这里应该调用的是代理对象；直接调用目标对象会导致事务失效
+            // return createVoucherOrder(voucherId);
+
+            // 需要导入spring-aop包，开启AOP代理
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);
+        }
+    }
+
+    @Override
+    @Transactional
+    public Result createVoucherOrder(Long voucherId) {
+        // 一人一单
+        Long userId = UserHolder.getUser().getId();
+
+        // 查询订单
+        int count = query().eq("user_id", userId)
+                .eq("voucher_id", voucherId)
+                .count();
+        if (count > 0) {
+            // 已经抢购过了
+            return Result.fail("已经抢购过了");
+        }
+
         // 扣减库存
         boolean success = seckillVoucherService.update()
                 // set stock = stock - 1
@@ -74,7 +104,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         long orderId = redisIdWorker.nextId("order");
         order.setId(orderId);
         // 用户id
-        Long userId = UserHolder.getUser().getId();
         order.setUserId(userId);
         // 优惠券id
         order.setVoucherId(voucherId);
