@@ -54,9 +54,20 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
         // 扣减库存
         boolean success = seckillVoucherService.update()
+                // set stock = stock - 1
                 .setSql("stock = stock - 1")
                 .eq("voucher_id", voucherId)
+                // 乐观锁, where id = ? and stock = ?
+                // .eq("stock", voucher.getStock())
+                // 这样会在高并发下导致大量的更新失败，每次并发都要判断有些多余
+                // 设置判断条件为stock > 0就会好很多
+                // 乐观锁优化，where id = ? and stock > 0
+                .gt("stock", 0)
                 .update();
+        if (!success) {
+            // 扣减失败，库存不足
+            return Result.fail("库存不足");
+        }
         // 创建订单
         VoucherOrder order = new VoucherOrder();
         // 订单id
