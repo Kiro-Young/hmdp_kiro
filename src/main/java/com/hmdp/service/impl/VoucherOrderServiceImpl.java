@@ -71,9 +71,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             while (true) {
                 try {
                     // 从阻塞队列中获取订单
-
-                    VoucherOrder order = orderTasks.take();
-                    handleVoucherOrder(order);
+                    VoucherOrder voucherOrder = orderTasks.take();
+                    // 创建订单
+                    handleVoucherOrder(voucherOrder);
                 } catch (InterruptedException e) {
                     log.error("订单保存失败", e);
                 }
@@ -97,7 +97,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
         try {
             // 获取代理对象（事务）
-            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             proxy.createVoucherOrder(order);
         } finally {
             // 释放锁
@@ -199,7 +198,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     public void createVoucherOrder(VoucherOrder voucherOrder) {
         // 一人一单
         Long userId = voucherOrder.getUserId();
-
         // 查询订单
         int count = query().eq("user_id", userId)
                 .eq("voucher_id", voucherOrder.getVoucherId())
@@ -209,7 +207,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             log.error("该用户已购买过！");
             return;
         }
-
         // 扣减库存
         boolean success = seckillVoucherService.update()
                 // set stock = stock - 1
