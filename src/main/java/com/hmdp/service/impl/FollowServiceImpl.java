@@ -50,7 +50,7 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
             boolean isSuccess = save(follow);
             if (isSuccess) {
                 // 关注成功，将关注的用户id存入redis
-                stringRedisTemplate.opsForSet().add(key + followUserId.toString());
+                stringRedisTemplate.opsForSet().add(key, followUserId.toString());
             }
         } else {
             // 取关，删除数据
