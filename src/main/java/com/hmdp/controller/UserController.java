@@ -102,4 +102,10 @@ public class UserController {
         // 注册
         return userService.sign();
     }
+
+    @PostMapping("/sign/count")
+    public Result signCount() {
+        // 查询连续签到次数
+        return userService.signCount();
+    }
 }
